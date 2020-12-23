@@ -17,17 +17,15 @@
 . $(dirname "$0")/globus_batch.config
 
 #======================CODE=====================================
-# initialize virtual environment for Globus CLI installation (refer to: https://docs.globus.org/cli/installation/virtualenv/)
-# Stas' account: "$HOME/.globus-cli-virtualenv/bin/activate"
-#source "$HOME/.globus-cli-virtualenv/bin/activate" # this is a user specific installation directory of the Globus CLI
-echo "--> activate the virtual environment to run Globus"
-echo "$globus_virtual_dir/bin/activate"
-source "$globus_virtual_dir/bin/activate"
 
-cd $globus_wrk_dir
-echo "--> activate local endpoint"
-globus endpoint activate $source_ep #activate source (MSSM) endpoint
+# setup Loging related variables
+# check if globus_log_dir exists, if not, create a new dir
+mkdir -p "$globus_log_dir"
+# define a log file for the current run
+GLB_LOG_FILE=$globus_log_dir/$(date +"%Y%m%d_%H%M%S")"_globus_transf_log.txt"
+echo "Log file for the current run is: "$GLB_LOG_FILE
 
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->Starting the process"  | tee -a "$GLB_LOG_FILE"
 # check if the specific name to be processed was provided, if not get all files from the request folder
 if [ "$transfer_request_file" == "" ]; then 
 	# get list of files in the transfer directory, based on the $SRCH_MAP
@@ -39,66 +37,86 @@ else
 		FILES=$transfer_request_file
 	else
 		# if the specified file does not exist, exist the script
-		echo "Exiting the process! - Cannot locate the specified request file: $transfer_request_file"
+		#echo "Exiting the process! - Cannot locate the specified request file: $transfer_request_file"
+		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Exiting the process! - Cannot locate the specified request file: "$transfer_request_file  | tee -a "$GLB_LOG_FILE"
 		exit 1
 	fi
 fi
 
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->Start processing files: "$FILES  | tee -a "$GLB_LOG_FILE"
+
+# check if there are any files to be processed
+if [ "$FILES" == "" ]; then
+	# if the specified file does not exist, exist the script
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Exiting the process! - No files available for processing"  | tee -a "$GLB_LOG_FILE"
+	exit 1
+fi
+
+# initialize virtual environment for Globus CLI installation (refer to: https://docs.globus.org/cli/installation/virtualenv/)
+# Stas' account: "$HOME/.globus-cli-virtualenv/bin/activate"
+#source "$HOME/.globus-cli-virtualenv/bin/activate" # this is a user specific installation directory of the Globus CLI
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->Activate the virtual environment to run Globus; command: $globus_virtual_dir/bin/activate"  | tee -a "$GLB_LOG_FILE"
+source "$globus_virtual_dir/bin/activate"
+
+cd $globus_wrk_dir
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->Activate local endpoint; command: globus endpoint activate $source_ep"  | tee -a "$GLB_LOG_FILE"
+globus endpoint activate $source_ep #activate source (MSSM) endpoint
+
 #loop through all files (based on a map) in the given folder (it will not go into the subfolders)
 for batchfile in $FILES
 do
-	echo $batchfile
-	
-	echo "Batch file selected for processing: $batchfile"
+	echo "" | tee -a "$GLB_LOG_FILE"
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Batch file selected for processing: $batchfile" | tee -a "$GLB_LOG_FILE"
 	
 	#define name and create a temporary copy of the batch file
 	batchfile_tmp=$batchfile"_"$(date +"%Y%m%d_%H%M%S")".tmp"
-	echo "--> create a temp copy of the batch file"
-	echo cp $batchfile $batchfile_tmp
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Create a temp copy of the batch file; command: cp $batchfile $batchfile_tmp"  | tee -a "$GLB_LOG_FILE"
 	cp $batchfile $batchfile_tmp
 	
 	#to remove Windows line endings 
 	sed -i 's/\r$//' "$batchfile_tmp"
 	
 	# replace destination prefix in the batch file, if it was specified in the file
-	echo "--> search for a destination path prefix ($dest_pref_find_str) in the batch file an replace it with the following: $dest_pref_val"
-	echo sed -i s+"$dest_pref_find_str"+"$dest_pref_val"+g $batchfile_tmp
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Search for a destination path prefix ($dest_pref_find_str) in the batch file an replace it with the following: $dest_pref_val."  | tee -a "$GLB_LOG_FILE"
 	sed -i s+"$dest_pref_find_str"+"$dest_pref_val"+g $batchfile_tmp
 
 	if [ "$transfer_name" == "" ]; then
 		tr_name=$(basename $batchfile)
+		#echo $tr_name
+		tr_name="${tr_name//'.'/'_'}" # remove any "." from the name, since Globus rejects names with the dots.
+		#echo $tr_name
 	else
 		tr_name=$transfer_name
 	fi
 	
-	echo "--> Transfer name assigned to the request: $tr_name"
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Transfer name assigned to the request: $tr_name"  | tee -a "$GLB_LOG_FILE"
 	
-	echo "--> submit Globus transfer request"
 	if [ "$PROD_RUN" == "1" ]; then
 		# actual execution
-		echo "--> actual execution of the transfer request"
-		#globus transfer --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp
+		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Proceeding with actual execution of the transfer request to the Globus site"  | tee -a "$GLB_LOG_FILE"
+		globus transfer --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1 | tee -a "$GLB_LOG_FILE"
 	else
 		# the following line is a dry-run for testing
-		echo "--> dry-run execution of the transfer request"
-		globus transfer --dry-run --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp
+		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Proceeding with dry-run execution of the transfer request (no actual submission to the Globus site)"  | tee -a "$GLB_LOG_FILE"
+		globus transfer --dry-run --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1 | tee -a "$GLB_LOG_FILE"
 	fi
 	
+	echo "" | tee -a "$GLB_LOG_FILE"
+	
 	# delete temp file
-	echo "--> delete a temp copy of the batch file"
-	echo rm $batchfile_tmp
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Delete a temp copy of the batch file; command: rm $batchfile_tmp"  | tee -a "$GLB_LOG_FILE"
 	rm $batchfile_tmp
 
 	# move processed batch file to "processed" folder
 	# check if globus_transfer_processed_dir exists, if not, create a new dir
 	mkdir -p "$globus_transfer_processed_dir"
 	batchfile_processed=$globus_transfer_processed_dir/$(date +"%Y%m%d_%H%M%S")"_"$(basename $batchfile)
-	echo "batchfile_processed => "$batchfile_processed
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename the processed file to "$(basename $batchfile)"; command: mv $batchfile $batchfile_processed"  | tee -a "$GLB_LOG_FILE"
 	mv $batchfile $batchfile_processed
 
 done
 
-echo "--> deactivate the virtual environment"
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->Deactivate the virtual environment"  | tee -a "$GLB_LOG_FILE"
 # deactivate virtual environment
 deactivate
 
@@ -106,14 +124,10 @@ deactivate
 
 if ( /home/stas/globusconnectpersonal-2.3.8/globusconnectpersonal -status | grep -q "Globus Online:   connected" )
 then
-	echo "--> Local Globus endpoint is already running, no action is needed."
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Checking status of local Globus endpoint - it is already running, no action is needed"  | tee -a "$GLB_LOG_FILE"
 else
-	echo "--> Local Globus endpoint is not running. Starting local Globus endpoint"
-	echo $start_local_endpoint
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Checking status of local Globus endpoint - it is not running. Starting local Globus endpoint; command: $start_local_endpoint"  | tee -a "$GLB_LOG_FILE"
 	eval "$start_local_endpoint"
 fi
 
-#/home/stas/globusconnectpersonal-2.3.8/globusconnectpersonal -start -restrict-paths rw/ext_data/shared/ECHO,rw/data/stas,rw/home/stas &
-
-
-
+echo "$(date +"%Y-%m-%d %H:%M:%S")-->The process has finished"  | tee -a "$GLB_LOG_FILE"
