@@ -1,0 +1,1 @@
+/ext_data/shared/.apps/globus_transfers/version_1.0/globus_batch_run.sh /ext_data/shared/.apps/globus_transfers/version_1.0/globus_batch_stas.config

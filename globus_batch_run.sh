@@ -13,12 +13,48 @@
 # "-r" - stands for recurcive; will copy all sub-folders recurcively and create needed structure on the destination
 
 #======================SETTINGS=====================================
-# load settings file
-. $(dirname "$0")/globus_batch.config
+# get the first argument value into a variables
+
+echo "The first argument provided =>" $1
+
+cnf_fl=$1
+#echo $cnf_fl
+
+if [ "$cnf_fl" == "" ] ; then
+	echo "The first argument provided was blank. This a required argument that provides a path to the config file. Aborting execution!"
+	exit 1
+fi
+
+#check if provided config file exists
+if test -f "$cnf_fl"; then
+	# load config file
+	echo "Attempting to load config file: $cnf_fl"
+	if source $cnf_fl ;then
+		echo "Config file ($cnf_fl) was successfully loaded."
+	else
+		echo "Error occured during loading the config file. Aborting execution!"
+		exit 1
+	fi
+else
+	echo "Provided config file ($cnf_fl) does not exist or cannot be accessed. Aborting execution!"
+	exit 1
+fi
+
+#for testing only
+#echo $globus_log_dir
+#exit 0
+
+#. $(dirname "$0")/globus_batch.config #old way of loading a config file
 
 #======================CODE=====================================
 
 # setup Loging related variables
+
+#if Logging directory is not provided, set it to the "logs" sub-folder created in the directory where the script is located
+if [ "$globus_log_dir" == "" ] ; then
+	globus_log_dir=$(dirname "$0")/logs
+fi
+
 # check if globus_log_dir exists, if not, create a new dir
 mkdir -p "$globus_log_dir"
 # define a log file for the current run
@@ -58,7 +94,7 @@ fi
 echo "$(date +"%Y-%m-%d %H:%M:%S")-->Activate the virtual environment to run Globus; command: $globus_virtual_dir/bin/activate"  | tee -a "$GLB_LOG_FILE"
 source "$globus_virtual_dir/bin/activate"
 
-cd $globus_wrk_dir
+# cd $globus_wrk_dir
 echo "$(date +"%Y-%m-%d %H:%M:%S")-->Activate local endpoint; command: globus endpoint activate $source_ep"  | tee -a "$GLB_LOG_FILE"
 globus endpoint activate $source_ep #activate source (MSSM) endpoint
 
@@ -111,7 +147,7 @@ do
 	# check if globus_transfer_processed_dir exists, if not, create a new dir
 	mkdir -p "$globus_transfer_processed_dir"
 	batchfile_processed=$globus_transfer_processed_dir/$(date +"%Y%m%d_%H%M%S")"_"$(basename $batchfile)
-	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename the processed file to "$(basename $batchfile)"; command: mv $batchfile $batchfile_processed"  | tee -a "$GLB_LOG_FILE"
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename the processed file "$(basename $batchfile)"; command: mv $batchfile $batchfile_processed"  | tee -a "$GLB_LOG_FILE"
 	mv $batchfile $batchfile_processed
 
 done
