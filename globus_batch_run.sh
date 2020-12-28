@@ -143,13 +143,16 @@ do
 	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Delete a temp copy of the batch file; command: rm $batchfile_tmp"  | tee -a "$GLB_LOG_FILE"
 	rm $batchfile_tmp
 
-	# move processed batch file to "processed" folder
-	# check if globus_transfer_processed_dir exists, if not, create a new dir
-	mkdir -p "$globus_transfer_processed_dir"
-	batchfile_processed=$globus_transfer_processed_dir/$(date +"%Y%m%d_%H%M%S")"_"$(basename $batchfile)
-	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename the processed file "$(basename $batchfile)"; command: mv $batchfile $batchfile_processed"  | tee -a "$GLB_LOG_FILE"
-	mv $batchfile $batchfile_processed
-
+	if [ "$PROD_RUN" == "1" ]; then
+		# move processed batch file to "processed" folder
+		# check if globus_transfer_processed_dir exists, if not, create a new dir
+		mkdir -p "$globus_transfer_processed_dir"
+		batchfile_processed=$globus_transfer_processed_dir/$(date +"%Y%m%d_%H%M%S")"_"$(basename $batchfile)
+		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename the processed file "$(basename $batchfile)"; command: mv $batchfile $batchfile_processed"  | tee -a "$GLB_LOG_FILE"
+		mv $batchfile $batchfile_processed
+	else
+		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Move/rename of the processed file "$(basename $batchfile)" won't be performed, since this is a dry-run."  | tee -a "$GLB_LOG_FILE"
+	fi
 done
 
 echo "$(date +"%Y-%m-%d %H:%M:%S")-->Deactivate the virtual environment"  | tee -a "$GLB_LOG_FILE"
