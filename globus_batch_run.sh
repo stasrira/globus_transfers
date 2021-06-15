@@ -126,14 +126,19 @@ do
 	fi
 	
 	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Transfer name assigned to the request: $tr_name"  | tee -a "$GLB_LOG_FILE"
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Set source endpoint id: $source_ep"  | tee -a "$GLB_LOG_FILE"
+	echo "$(date +"%Y-%m-%d %H:%M:%S")-->Set target endpoint id: $dest_ep"  | tee -a "$GLB_LOG_FILE"
 	
 	if [ "$PROD_RUN" == "1" ]; then
 		# actual execution
 		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Proceeding with actual execution of the transfer request to the Globus site"  | tee -a "$GLB_LOG_FILE"
+		echo "Command to run: globus transfer --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1" | tee -a "$GLB_LOG_FILE"
 		globus transfer --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1 | tee -a "$GLB_LOG_FILE"
+
 	else
 		# the following line is a dry-run for testing
 		echo "$(date +"%Y-%m-%d %H:%M:%S")-->Proceeding with dry-run execution of the transfer request (no actual submission to the Globus site)"  | tee -a "$GLB_LOG_FILE"
+		echo "Command to run: globus transfer --dry-run --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1" | tee -a "$GLB_LOG_FILE"
 		globus transfer --dry-run --label $tr_name --sync-level checksum -v $source_ep $dest_ep --batch < $batchfile_tmp 2>&1 | tee -a "$GLB_LOG_FILE"
 	fi
 	
